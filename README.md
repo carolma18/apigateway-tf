@@ -231,7 +231,7 @@ resource "aws_api_gateway_integration" "gst_agent_lambda" {
 
 ###
 Outputs:
-
+api-gateway-public-url = https://axyy5rmux4.execute-api.us-east-1.amazonaws.com
 acm_certificate_arn = "arn:aws:acm:us-east-1:518222289458:certificate/21f35244-f931-43ee-be8a-a885847e159f"
 acm_dns_validation_records = {
   "api.darkside.dev.latam.com" = {
