@@ -145,6 +145,9 @@ terraform apply -var="enable_custom_domain=true"
 | `rest_api_name` | `darkside-api` | Name of the REST API |
 | `domain_name` | `api.darkside.dev.latam.com` | Custom domain |
 | `enable_custom_domain` | `false` | **Phase 1: false, Phase 2: true** |
+| `lambda_function_arn` | `arn:aws:lambda:...` | ARN of the Lambda function |
+| `endpoint` | `gst-agent` | Main path part |
+| `endpoint_resource` | `correct-name` | Second level path part |
 
 Override with `terraform.tfvars`:
 ```hcl
@@ -152,6 +155,9 @@ aws_region           = "us-east-1"
 rest_api_name        = "darkside-api"
 domain_name          = "api.darkside.dev.latam.com"
 enable_custom_domain = false  # Set to true for Phase 2
+lambda_function_arn  = "arn:aws:lambda:us-east-1:518222289458:function:aws-lambda-test"
+endpoint             = "gst-agent"
+endpoint_resource    = "correct-name"
 ```
 
 ---

@@ -25,3 +25,21 @@ variable "enable_custom_domain" {
   type        = bool
   default     = false
 }
+
+variable "lambda_function_arn" {
+  description = "ARN of the Lambda function to integrate with"
+  type        = string
+  default     = "arn:aws:lambda:us-east-1:518222289458:function:aws-lambda-test"
+}
+
+variable "endpoint" {
+  description = "Path part for the main endpoint resource"
+  type        = string
+  default     = "gst-agent"
+}
+
+variable "endpoint_resource" {
+  description = "Path part for the second level endpoint resource"
+  type        = string
+  default     = "correct-name"
+}

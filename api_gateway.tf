@@ -23,13 +23,13 @@ resource "aws_api_gateway_rest_api" "main" {
 resource "aws_api_gateway_resource" "gst_agent" {
   rest_api_id = aws_api_gateway_rest_api.main.id
   parent_id   = aws_api_gateway_rest_api.main.root_resource_id
-  path_part   = "gst-agent"
+  path_part   = var.endpoint
 }
 
 resource "aws_api_gateway_resource" "correct_name" {
   rest_api_id = aws_api_gateway_rest_api.main.id
   parent_id   = aws_api_gateway_resource.gst_agent.id
-  path_part   = "correct-name"
+  path_part   = var.endpoint_resource
 }
 
 # =============================================================================
@@ -57,7 +57,7 @@ resource "aws_api_gateway_method" "correct_name_any" {
 # =============================================================================
 
 locals {
-  lambda_arn = "arn:aws:lambda:us-east-1:518222289458:function:aws-lambda-test"
+  lambda_arn = var.lambda_function_arn
 }
 
 resource "aws_api_gateway_integration" "gst_agent_lambda" {
@@ -85,7 +85,7 @@ resource "aws_api_gateway_integration" "correct_name_lambda" {
 resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = "aws-lambda-test"
+  function_name = var.lambda_function_arn
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
 }
