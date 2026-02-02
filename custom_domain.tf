@@ -34,5 +34,6 @@ resource "aws_api_gateway_base_path_mapping" "main" {
   depends_on = [
     aws_api_gateway_domain_name.main,
     aws_api_gateway_stage.dev,
+    aws_acm_certificate_validation.api, # Ensure cert is valid before mapping
   ]
 }

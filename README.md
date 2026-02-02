@@ -85,13 +85,13 @@ terraform apply
 - ✅ REST API Gateway with all resources
 - ✅ API Key and Usage Plan
 - ✅ CloudWatch Log Group and IAM Role
+- ✅ Custom Domain Name (generated `d-xxxx` target)
 - ⏸️ Certificate Validation (skipped)
-- ⏸️ Custom Domain (skipped)
 - ⏸️ Base Path Mapping (skipped)
 
 **Outputs you need for Cloudflare PR:**
 ```hcl
-# Get these from terraform output
+# 1. Certificate Validation Record (CNAME)
 acm_dns_validation_records = {
   "api.darkside.dev.latam.com" = {
     name  = "_xxxxxx.api.darkside.dev.latam.com."
@@ -100,6 +100,9 @@ acm_dns_validation_records = {
     ttl   = 300
   }
 }
+
+# 2. Custom Domain Target (CNAME)
+api_gateway_regional_domain_name = "d-xxxxxxxxx.execute-api.us-east-1.amazonaws.com"
 ```
 
 #### External Step: Cloudflare PR
@@ -230,8 +233,7 @@ resource "aws_api_gateway_integration" "gst_agent_lambda" {
 
 
 ###
-Outputs:
-api-gateway-public-url = https://axyy5rmux4.execute-api.us-east-1.amazonaws.com
+Output:
 acm_certificate_arn = "arn:aws:acm:us-east-1:518222289458:certificate/21f35244-f931-43ee-be8a-a885847e159f"
 acm_dns_validation_records = {
   "api.darkside.dev.latam.com" = {
@@ -249,3 +251,19 @@ cloudwatch_log_group = "/aws/api-gateway/darkside"
 custom_domain_url = "https://api.darkside.dev.latam.com"
 rest_api_base_url = "https://axyy5rmux4.execute-api.us-east-1.amazonaws.com/dev"
 rest_api_invoke_url = "arn:aws:execute-api:us-east-1:518222289458:axyy5rmux4/dev"
+
+
+Phase 1 (Apply NOW): Only the ACM Validation record will be in the output. Use this to create the first PR.
+powershell
+terraform apply
+External (Wait): Create the validation CNAME in Cloudflare. Wait for the certificate status to become "Issued" in the AWS console (~5-10 mins).
+Phase 2 (After Issued): Run the apply with the flag. This will finally create the Domain Name and provide the d-xxxx target you need for the final PR.
+powershell
+terraform apply -var="enable_custom_domain=true"
+
+Entonces:
+1. Ejecutar terraform apply
+2. Crear el PR con el output de acm_dns_validation_records
+3. Esperar a que el certificado se valide (pase de pending a issued)
+4. Ejecutar terraform apply -var="enable_custom_domain=true"
+5. Crear el PR con el output de api_gateway_regional_domain_name
