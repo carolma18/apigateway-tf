@@ -32,14 +32,17 @@ variable "lambda_function_arn" {
   default     = "arn:aws:lambda:us-east-1:518222289458:function:aws-lambda-test"
 }
 
-variable "endpoint" {
-  description = "Path part for the main endpoint resource"
-  type        = string
-  default     = "gst-agent"
-}
-
-variable "endpoint_resource" {
-  description = "Path part for the second level endpoint resource"
-  type        = string
-  default     = "correct-name"
+variable "endpoints" {
+  description = "Map of endpoints and their sub-resources. Each endpoint can have multiple resources."
+  type = map(object({
+    resources = list(string)
+  }))
+  default = {
+    "gst-agent" = {
+      resources = ["correct-name"]
+    }
+    "notification-service" = {
+      resources = ["webhook"]
+    }
+  }
 }

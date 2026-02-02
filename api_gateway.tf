@@ -17,36 +17,54 @@ resource "aws_api_gateway_rest_api" "main" {
 }
 
 # =============================================================================
-# API Resources: /gst-agent and /gst-agent/correct-name
+# API Resources: Dynamic endpoints with for_each
 # =============================================================================
 
-resource "aws_api_gateway_resource" "gst_agent" {
+# Create main endpoint resources (e.g., /gst-agent, /notification-service)
+resource "aws_api_gateway_resource" "endpoints" {
+  for_each    = var.endpoints
   rest_api_id = aws_api_gateway_rest_api.main.id
   parent_id   = aws_api_gateway_rest_api.main.root_resource_id
-  path_part   = var.endpoint
+  path_part   = each.key
 }
 
-resource "aws_api_gateway_resource" "correct_name" {
+# Create sub-resources for each endpoint (e.g., /gst-agent/correct-name)
+resource "aws_api_gateway_resource" "endpoint_resources" {
+  for_each = {
+    for pair in flatten([
+      for endpoint_name, endpoint_config in var.endpoints : [
+        for resource_name in endpoint_config.resources : {
+          key           = "${endpoint_name}/${resource_name}"
+          endpoint_name = endpoint_name
+          resource_name = resource_name
+        }
+      ]
+    ]) : pair.key => pair
+  }
   rest_api_id = aws_api_gateway_rest_api.main.id
-  parent_id   = aws_api_gateway_resource.gst_agent.id
-  path_part   = var.endpoint_resource
+  parent_id   = aws_api_gateway_resource.endpoints[each.value.endpoint_name].id
+  path_part   = each.value.resource_name
 }
 
 # =============================================================================
-# Methods - ANY on both resources with API Key required
+# Methods - ANY on all resources with API Key required
 # =============================================================================
 
-resource "aws_api_gateway_method" "gst_agent_any" {
+# Methods for main endpoints
+resource "aws_api_gateway_method" "endpoints" {
+  for_each         = aws_api_gateway_resource.endpoints
   rest_api_id      = aws_api_gateway_rest_api.main.id
-  resource_id      = aws_api_gateway_resource.gst_agent.id
+  resource_id      = each.value.id
   http_method      = "ANY"
   authorization    = "NONE"
   api_key_required = true
 }
 
-resource "aws_api_gateway_method" "correct_name_any" {
+# Methods for sub-resources
+resource "aws_api_gateway_method" "endpoint_resources" {
+  for_each         = aws_api_gateway_resource.endpoint_resources
   rest_api_id      = aws_api_gateway_rest_api.main.id
-  resource_id      = aws_api_gateway_resource.correct_name.id
+  resource_id      = each.value.id
   http_method      = "ANY"
   authorization    = "NONE"
   api_key_required = true
@@ -60,19 +78,23 @@ locals {
   lambda_arn = var.lambda_function_arn
 }
 
-resource "aws_api_gateway_integration" "gst_agent_lambda" {
+# Lambda integrations for main endpoints
+resource "aws_api_gateway_integration" "endpoints" {
+  for_each                 = aws_api_gateway_method.endpoints
   rest_api_id             = aws_api_gateway_rest_api.main.id
-  resource_id             = aws_api_gateway_resource.gst_agent.id
-  http_method             = aws_api_gateway_method.gst_agent_any.http_method
+  resource_id             = each.value.resource_id
+  http_method             = each.value.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${local.lambda_arn}/invocations"
 }
 
-resource "aws_api_gateway_integration" "correct_name_lambda" {
+# Lambda integrations for sub-resources
+resource "aws_api_gateway_integration" "endpoint_resources" {
+  for_each                 = aws_api_gateway_method.endpoint_resources
   rest_api_id             = aws_api_gateway_rest_api.main.id
-  resource_id             = aws_api_gateway_resource.correct_name.id
-  http_method             = aws_api_gateway_method.correct_name_any.http_method
+  resource_id             = each.value.resource_id
+  http_method             = each.value.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${local.lambda_arn}/invocations"
@@ -99,14 +121,30 @@ resource "aws_api_gateway_deployment" "main" {
 
   triggers = {
     redeployment = sha1(jsonencode([
-      aws_api_gateway_resource.gst_agent.id,
-      aws_api_gateway_resource.correct_name.id,
-      aws_api_gateway_method.gst_agent_any.id,
-      aws_api_gateway_method.correct_name_any.id,
-      aws_api_gateway_integration.gst_agent_lambda.id,
-      aws_api_gateway_integration.gst_agent_lambda.uri,
-      aws_api_gateway_integration.correct_name_lambda.id,
-      aws_api_gateway_integration.correct_name_lambda.uri,
+      # All endpoint resources
+      for endpoint in aws_api_gateway_resource.endpoints : {
+        id = endpoint.id
+      },
+      # All sub-resources
+      for resource in aws_api_gateway_resource.endpoint_resources : {
+        id = resource.id
+      },
+      # All methods
+      for method in aws_api_gateway_method.endpoints : {
+        id = method.id
+      },
+      for method in aws_api_gateway_method.endpoint_resources : {
+        id = method.id
+      },
+      # All integrations
+      for integration in aws_api_gateway_integration.endpoints : {
+        id  = integration.id
+        uri = integration.uri
+      },
+      for integration in aws_api_gateway_integration.endpoint_resources : {
+        id  = integration.id
+        uri = integration.uri
+      },
       # Force redeploy timestamp - change this to force a new deployment
       "2026-02-02T12:19:00",
     ]))
@@ -117,8 +155,8 @@ resource "aws_api_gateway_deployment" "main" {
   }
 
   depends_on = [
-    aws_api_gateway_integration.gst_agent_lambda,
-    aws_api_gateway_integration.correct_name_lambda,
+    aws_api_gateway_integration.endpoints,
+    aws_api_gateway_integration.endpoint_resources,
   ]
 }
 
