@@ -10,7 +10,7 @@ resource "aws_acm_certificate" "api" {
   validation_method = "DNS"
 
   tags = {
-    Name        = "gst-chatbot-api-cert"
+    Name        = "darkside-api-cert"
     Environment = "dev"
   }
 
@@ -21,7 +21,9 @@ resource "aws_acm_certificate" "api" {
 
 # This resource will wait for the certificate to be validated
 # It requires the DNS records to exist in Cloudflare BEFORE it can complete
+# Only created in Phase 2 when enable_custom_domain = true
 resource "aws_acm_certificate_validation" "api" {
+  count                   = var.enable_custom_domain ? 1 : 0
   certificate_arn         = aws_acm_certificate.api.arn
   validation_record_fqdns = [for record in aws_acm_certificate.api.domain_validation_options : record.resource_record_name]
 

@@ -3,7 +3,7 @@
 # =============================================================================
 
 resource "aws_cloudwatch_log_group" "api_gateway" {
-  name              = "/aws/api-gateway/${var.rest_api_name}"
+  name              = "/aws/api-gateway/darkside"
   retention_in_days = 30
 
   tags = {
@@ -58,7 +58,7 @@ resource "aws_api_gateway_account" "main" {
 
 resource "aws_api_gateway_method_settings" "all" {
   rest_api_id = aws_api_gateway_rest_api.main.id
-  stage_name  = aws_api_gateway_stage.prod.stage_name
+  stage_name  = aws_api_gateway_stage.dev.stage_name
   method_path = "*/*"
 
   settings {
@@ -71,6 +71,6 @@ resource "aws_api_gateway_method_settings" "all" {
 
   depends_on = [
     aws_api_gateway_account.main,
-    aws_api_gateway_stage.prod,
+    aws_api_gateway_stage.dev,
   ]
 }

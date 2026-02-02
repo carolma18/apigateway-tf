@@ -13,13 +13,13 @@ resource "aws_api_gateway_api_key" "main" {
   }
 }
 
-resource "aws_api_gateway_usage_plan" "main" {
+resource "aws_api_gateway_usage_plan" "dev" {
   name        = "${var.rest_api_name}-usage-plan"
-  description = "Usage plan with 10,000 requests per month quota"
+  description = "Usage plan with 10,000 requests per month quota (dev)"
 
   api_stages {
     api_id = aws_api_gateway_rest_api.main.id
-    stage  = aws_api_gateway_stage.prod.stage_name
+    stage  = aws_api_gateway_stage.dev.stage_name
   }
 
   quota_settings {
@@ -38,11 +38,11 @@ resource "aws_api_gateway_usage_plan" "main" {
     Environment = "dev"
   }
 
-  depends_on = [aws_api_gateway_stage.prod]
+  depends_on = [aws_api_gateway_stage.dev]
 }
 
-resource "aws_api_gateway_usage_plan_key" "main" {
+resource "aws_api_gateway_usage_plan_key" "dev" {
   key_id        = aws_api_gateway_api_key.main.id
   key_type      = "API_KEY"
-  usage_plan_id = aws_api_gateway_usage_plan.main.id
+  usage_plan_id = aws_api_gateway_usage_plan.dev.id
 }

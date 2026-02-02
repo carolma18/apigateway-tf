@@ -3,7 +3,7 @@
 ## Overview
 
 This Terraform configuration creates a **Regional AWS API Gateway REST API** with:
-- Custom domain: `api.agent-gss.dev.latam.com`
+- Custom domain: `api.darkside.dev.latam.com`
 - ACM certificate with DNS validation
 - API Key authentication with 10,000 requests/month quota
 - CloudWatch logging at INFO level
@@ -15,21 +15,21 @@ This Terraform configuration creates a **Regional AWS API Gateway REST API** wit
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           Cloudflare DNS                                 │
-│  api.agent-gss.dev.latam.com → CNAME → <regional_domain_name>           │
+│  api.darkside.dev.latam.com → CNAME → <regional_domain_name>             │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    AWS API Gateway (Regional)                            │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │  Custom Domain: api.agent-gss.dev.latam.com                     │    │
+│  │  Custom Domain: api.darkside.dev.latam.com                       │    │
 │  │  Certificate: ACM (DNS validated)                               │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
 │                                    │                                     │
 │                                    ▼                                     │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │  REST API: gst-chatbot-api                                      │    │
-│  │  Stage: prod                                                    │    │
+│  │  REST API: darkside-api                                          │    │
+│  │  Stage: dev                                                    │    │
 │  │  ├── /gst-agent          (ANY) - API Key Required               │    │
 │  │  └── /gst-agent/correct-name (ANY) - API Key Required           │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
@@ -42,7 +42,7 @@ This Terraform configuration creates a **Regional AWS API Gateway REST API** wit
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
-                    CloudWatch Logs (/aws/api-gateway/gst-chatbot-api)
+                    CloudWatch Logs (/aws/api-gateway/darkside)
 ```
 
 ---
@@ -70,13 +70,14 @@ This Terraform configuration creates a **Regional AWS API Gateway REST API** wit
 - DNS CNAME for the domain needs the **API Gateway regional domain name**
 - But regional domain name only exists after custom domain is created
 
-### The Solution
+### The Solution: `enable_custom_domain` Variable
 
-#### Phase 1: Initial Apply
+#### Phase 1: Initial Apply (default)
 ```powershell
 cd c:\code\apigateway-tf
 terraform init
 terraform apply
+# enable_custom_domain = false (default)
 ```
 
 **What gets created:**
@@ -84,15 +85,16 @@ terraform apply
 - ✅ REST API Gateway with all resources
 - ✅ API Key and Usage Plan
 - ✅ CloudWatch Log Group and IAM Role
-- ⏸️ Custom Domain (waiting for cert validation)
-- ⏸️ Base Path Mapping (waiting for custom domain)
+- ⏸️ Certificate Validation (skipped)
+- ⏸️ Custom Domain (skipped)
+- ⏸️ Base Path Mapping (skipped)
 
 **Outputs you need for Cloudflare PR:**
 ```hcl
 # Get these from terraform output
 acm_dns_validation_records = {
-  "api.agent-gss.dev.latam.com" = {
-    name  = "_xxxxxx.api.agent-gss.dev.latam.com."
+  "api.darkside.dev.latam.com" = {
+    name  = "_xxxxxx.api.darkside.dev.latam.com."
     type  = "CNAME"
     value = "_yyyyyy.acm-validations.aws."
     ttl   = 300
@@ -106,7 +108,7 @@ Create DNS records in Cloudflare:
 1. **ACM Validation Record** (required for Phase 2):
    ```
    Type: CNAME
-   Name: _xxxxxx.api.agent-gss.dev.latam.com
+   Name: _xxxxxx.api.darkside.dev.latam.com
    Target: _yyyyyy.acm-validations.aws
    Proxy: OFF (DNS only - grey cloud!)
    ```
@@ -114,19 +116,20 @@ Create DNS records in Cloudflare:
 2. **API Domain Record** (after Phase 2):
    ```
    Type: CNAME
-   Name: api.agent-gss.dev.latam.com
+   Name: api.darkside.dev.latam.com
    Target: <api_gateway_regional_domain_name from output>
    Proxy: ON or OFF (your choice)
    ```
 
 #### Phase 2: After DNS Propagation
-Wait 5-30 minutes for certificate validation, then:
+Wait 5-30 minutes for DNS to propagate, then:
 ```powershell
-terraform apply
+terraform apply -var="enable_custom_domain=true"
 ```
 
 **What gets created:**
-- ✅ Custom Domain (now cert is validated)
+- ✅ Certificate Validation (waits for validation)
+- ✅ Custom Domain
 - ✅ Base Path Mapping
 
 ---
@@ -136,14 +139,16 @@ terraform apply
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `aws_region` | `us-east-1` | AWS region |
-| `rest_api_name` | `gst-chatbot-api` | Name of the REST API |
-| `domain_name` | `api.agent-gss.dev.latam.com` | Custom domain |
+| `rest_api_name` | `darkside-api` | Name of the REST API |
+| `domain_name` | `api.darkside.dev.latam.com` | Custom domain |
+| `enable_custom_domain` | `false` | **Phase 1: false, Phase 2: true** |
 
 Override with `terraform.tfvars`:
 ```hcl
-aws_region    = "us-east-1"
-rest_api_name = "gst-chatbot-api"
-domain_name   = "api.agent-gss.dev.latam.com"
+aws_region           = "us-east-1"
+rest_api_name        = "darkside-api"
+domain_name          = "api.darkside.dev.latam.com"
+enable_custom_domain = false  # Set to true for Phase 2
 ```
 
 ---
@@ -178,7 +183,7 @@ curl -H "x-api-key: $API_KEY" "$BASE_URL/gst-agent/correct-name"
 
 ### Custom Domain (after Phase 2 + DNS propagation):
 ```powershell
-curl -H "x-api-key: $API_KEY" https://api.agent-gss.dev.latam.com/gst-agent
+curl -H "x-api-key: $API_KEY" https://api.darkside.dev.latam.com/gst-agent
 ```
 
 ---
@@ -222,3 +227,25 @@ resource "aws_api_gateway_integration" "gst_agent_lambda" {
 - Check Cloudflare DNS propagation
 - Verify CNAME points to `api_gateway_regional_domain_name`
 - Wait for DNS TTL to expire
+
+
+###
+Outputs:
+
+acm_certificate_arn = "arn:aws:acm:us-east-1:518222289458:certificate/21f35244-f931-43ee-be8a-a885847e159f"
+acm_dns_validation_records = {
+  "api.darkside.dev.latam.com" = {
+    "name" = "_517a8d14f7ddc85b0b3fdfe08783efc7.api.darkside.dev.latam.com."
+    "ttl" = 300
+    "type" = "CNAME"
+    "value" = "_ae613d3f735cfe73b8503331df27ee17.jkddzztszm.acm-validations.aws."
+  }
+}
+api_gateway_regional_domain_name = "Run Phase 2 with enable_custom_domain=true"
+api_gateway_regional_zone_id = "Run Phase 2 with enable_custom_domain=true"
+api_key_id = "7ttw10mk52"
+api_key_value = <sensitive>
+cloudwatch_log_group = "/aws/api-gateway/darkside"
+custom_domain_url = "https://api.darkside.dev.latam.com"
+rest_api_base_url = "https://axyy5rmux4.execute-api.us-east-1.amazonaws.com/dev"
+rest_api_invoke_url = "arn:aws:execute-api:us-east-1:518222289458:axyy5rmux4/dev"

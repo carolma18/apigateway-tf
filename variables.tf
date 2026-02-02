@@ -11,11 +11,17 @@ variable "aws_region" {
 variable "rest_api_name" {
   description = "Name of the REST API Gateway"
   type        = string
-  default     = "gst-chatbot-api"
+  default     = "darkside-api"
 }
 
 variable "domain_name" {
   description = "Custom domain name for the API"
   type        = string
-  default     = "api.agent-gss.dev.latam.com"
+  default     = "api.darkside.dev.latam.com"
+}
+
+variable "enable_custom_domain" {
+  description = "Set to true ONLY after DNS validation records exist in Cloudflare. Phase 1: false, Phase 2: true"
+  type        = bool
+  default     = false
 }

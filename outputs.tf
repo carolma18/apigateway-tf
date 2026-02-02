@@ -28,16 +28,17 @@ output "acm_dns_validation_records" {
 
 # -----------------------------------------------------------------------------
 # API Gateway Regional Domain Outputs (for Cloudflare CNAME after validation)
+# Only available after Phase 2 (enable_custom_domain = true)
 # -----------------------------------------------------------------------------
 
 output "api_gateway_regional_domain_name" {
   description = "Regional domain name of the API Gateway custom domain (CNAME target for Cloudflare)"
-  value       = aws_api_gateway_domain_name.main.regional_domain_name
+  value       = try(aws_api_gateway_domain_name.main[0].regional_domain_name, "Run Phase 2 with enable_custom_domain=true")
 }
 
 output "api_gateway_regional_zone_id" {
   description = "Regional hosted zone ID (for Route53 alias records if needed)"
-  value       = aws_api_gateway_domain_name.main.regional_zone_id
+  value       = try(aws_api_gateway_domain_name.main[0].regional_zone_id, "Run Phase 2 with enable_custom_domain=true")
 }
 
 # -----------------------------------------------------------------------------
@@ -46,12 +47,12 @@ output "api_gateway_regional_zone_id" {
 
 output "rest_api_invoke_url" {
   description = "Direct invoke URL for the REST API (without custom domain)"
-  value       = "${aws_api_gateway_rest_api.main.execution_arn}/${aws_api_gateway_stage.prod.stage_name}"
+  value       = "${aws_api_gateway_rest_api.main.execution_arn}/${aws_api_gateway_stage.dev.stage_name}"
 }
 
 output "rest_api_base_url" {
   description = "Base URL for the REST API stage"
-  value       = aws_api_gateway_stage.prod.invoke_url
+  value       = aws_api_gateway_stage.dev.invoke_url
 }
 
 output "custom_domain_url" {

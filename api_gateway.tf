@@ -1,10 +1,10 @@
 # =============================================================================
-# REST API Gateway - gst-chatbot-api
+# REST API Gateway - darkside-api
 # =============================================================================
 
 resource "aws_api_gateway_rest_api" "main" {
   name        = var.rest_api_name
-  description = "GST Chatbot REST API with custom domain"
+  description = "Darkside REST API with custom domain"
 
   endpoint_configuration {
     types = ["REGIONAL"]
@@ -53,85 +53,41 @@ resource "aws_api_gateway_method" "correct_name_any" {
 }
 
 # =============================================================================
-# Mock Integrations (placeholder - replace with Lambda/HTTP integration)
+# Lambda Integration
 # =============================================================================
 
-resource "aws_api_gateway_integration" "gst_agent_mock" {
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.gst_agent.id
-  http_method = aws_api_gateway_method.gst_agent_any.http_method
-  type        = "MOCK"
-
-  request_templates = {
-    "application/json" = jsonencode({
-      statusCode = 200
-    })
-  }
+locals {
+  lambda_arn = "arn:aws:lambda:us-east-1:518222289458:function:aws-lambda-test"
 }
 
-resource "aws_api_gateway_integration" "correct_name_mock" {
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.correct_name.id
-  http_method = aws_api_gateway_method.correct_name_any.http_method
-  type        = "MOCK"
+resource "aws_api_gateway_integration" "gst_agent_lambda" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.gst_agent.id
+  http_method             = aws_api_gateway_method.gst_agent_any.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${local.lambda_arn}/invocations"
+}
 
-  request_templates = {
-    "application/json" = jsonencode({
-      statusCode = 200
-    })
-  }
+resource "aws_api_gateway_integration" "correct_name_lambda" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.correct_name.id
+  http_method             = aws_api_gateway_method.correct_name_any.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${local.lambda_arn}/invocations"
 }
 
 # =============================================================================
-# Mock Integration Responses
+# Lambda Permission - Allow API Gateway to invoke Lambda
 # =============================================================================
 
-resource "aws_api_gateway_method_response" "gst_agent_200" {
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.gst_agent.id
-  http_method = aws_api_gateway_method.gst_agent_any.http_method
-  status_code = "200"
-
-  response_models = {
-    "application/json" = "Empty"
-  }
-}
-
-resource "aws_api_gateway_integration_response" "gst_agent_mock" {
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.gst_agent.id
-  http_method = aws_api_gateway_method.gst_agent_any.http_method
-  status_code = aws_api_gateway_method_response.gst_agent_200.status_code
-
-  response_templates = {
-    "application/json" = jsonencode({
-      message = "GST Agent endpoint - replace with Lambda integration"
-    })
-  }
-}
-
-resource "aws_api_gateway_method_response" "correct_name_200" {
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.correct_name.id
-  http_method = aws_api_gateway_method.correct_name_any.http_method
-  status_code = "200"
-
-  response_models = {
-    "application/json" = "Empty"
-  }
-}
-
-resource "aws_api_gateway_integration_response" "correct_name_mock" {
-  rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.correct_name.id
-  http_method = aws_api_gateway_method.correct_name_any.http_method
-  status_code = aws_api_gateway_method_response.correct_name_200.status_code
-
-  response_templates = {
-    "application/json" = jsonencode({
-      message = "Correct Name endpoint - replace with Lambda integration"
-    })
-  }
+resource "aws_lambda_permission" "api_gateway" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = "aws-lambda-test"
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
 }
 
 # =============================================================================
@@ -147,8 +103,12 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_resource.correct_name.id,
       aws_api_gateway_method.gst_agent_any.id,
       aws_api_gateway_method.correct_name_any.id,
-      aws_api_gateway_integration.gst_agent_mock.id,
-      aws_api_gateway_integration.correct_name_mock.id,
+      aws_api_gateway_integration.gst_agent_lambda.id,
+      aws_api_gateway_integration.gst_agent_lambda.uri,
+      aws_api_gateway_integration.correct_name_lambda.id,
+      aws_api_gateway_integration.correct_name_lambda.uri,
+      # Force redeploy timestamp - change this to force a new deployment
+      "2026-02-02T12:19:00",
     ]))
   }
 
@@ -157,17 +117,15 @@ resource "aws_api_gateway_deployment" "main" {
   }
 
   depends_on = [
-    aws_api_gateway_integration.gst_agent_mock,
-    aws_api_gateway_integration.correct_name_mock,
-    aws_api_gateway_integration_response.gst_agent_mock,
-    aws_api_gateway_integration_response.correct_name_mock,
+    aws_api_gateway_integration.gst_agent_lambda,
+    aws_api_gateway_integration.correct_name_lambda,
   ]
 }
 
-resource "aws_api_gateway_stage" "prod" {
+resource "aws_api_gateway_stage" "dev" {
   deployment_id = aws_api_gateway_deployment.main.id
   rest_api_id   = aws_api_gateway_rest_api.main.id
-  stage_name    = "prod"
+  stage_name    = "dev"
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_gateway.arn
@@ -187,7 +145,7 @@ resource "aws_api_gateway_stage" "prod" {
   }
 
   tags = {
-    Name        = "${var.rest_api_name}-prod"
+    Name        = "${var.rest_api_name}-dev"
     Environment = "dev"
   }
 
