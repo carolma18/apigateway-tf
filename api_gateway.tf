@@ -120,34 +120,36 @@ resource "aws_api_gateway_deployment" "main" {
   rest_api_id = aws_api_gateway_rest_api.main.id
 
   triggers = {
-    redeployment = sha1(jsonencode([
+    redeployment = sha1(jsonencode(concat(
       # All endpoint resources
-      for endpoint in aws_api_gateway_resource.endpoints : {
+      [for endpoint in aws_api_gateway_resource.endpoints : {
         id = endpoint.id
-      },
+      }],
       # All sub-resources
-      for resource in aws_api_gateway_resource.endpoint_resources : {
+      [for resource in aws_api_gateway_resource.endpoint_resources : {
         id = resource.id
-      },
+      }],
       # All methods
-      for method in aws_api_gateway_method.endpoints : {
+      [for method in aws_api_gateway_method.endpoints : {
         id = method.id
-      },
-      for method in aws_api_gateway_method.endpoint_resources : {
+      }],
+      [for method in aws_api_gateway_method.endpoint_resources : {
         id = method.id
-      },
+      }],
       # All integrations
-      for integration in aws_api_gateway_integration.endpoints : {
+      [for integration in aws_api_gateway_integration.endpoints : {
         id  = integration.id
         uri = integration.uri
-      },
-      for integration in aws_api_gateway_integration.endpoint_resources : {
+      }],
+      [for integration in aws_api_gateway_integration.endpoint_resources : {
         id  = integration.id
         uri = integration.uri
-      },
+      }],
       # Force redeploy timestamp - change this to force a new deployment
-      "2026-02-02T12:19:00",
-    ]))
+      [{
+        timestamp = "2026-02-02T12:19:00"
+      }]
+    )))
   }
 
   lifecycle {
